@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/4.0.0/github-markdown.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release/build/styles/default.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/markdown-it-texmath/css/texmath.min.css">
+<link rel="stylesheet" href="file:////home/cestien/.vscode/extensions/goessner.mdmath-2.7.4/themes/default/style.css">
+
+</head>
+<body class="markdown-body">
+<div  dir="auto" ></div>
+<link href="/home/cestien/memoria/template/nota_template/miestilo.css" rel="stylesheet"></link>
+<h1 dir="auto" id="pseudo-c%C3%B3digo-y-comentarios">Pseudo código y comentarios</h1>
+<p dir="auto">Notas para poder implementar el código en pytorch.</p>
+<pre><code class="code-line language-python" dir="auto">main()
+    train_data, valid_data, test_data, label_encoder = dataio_prep(hparams)
+    ASR_Brain()
+    fit()
+    evaluate()
+
+fit()
+    train_set = self.make_dataloader(train_data)
+    valid_set = self.make_dataloader(valid_data)
+    <span class="hljs-keyword">for</span> epoch <span class="hljs-keyword">in</span> epoch.counter:
+        <span class="hljs-comment"># on stage_start</span>
+        ctc_metric = speechbrain.utils.metric_stats.MetricStats(metric=speechbrain.nnet.losses.ctc_loss)
+        per_metric = speechbrain.utils.metric_stats.ErrorRateStats
+```python
+train_data, valid_data, test_data, label_encoder = dataio_prep(hparams)
+    <span class="hljs-comment"># Crea los datasets</span>
+    train_data = sb.dataio.dataset.DynamicItemDataset.from_json(json_path)
+    valid_data = sb.dataio.dataset.DynamicItemDataset.from_json(json_path)
+    test_data = sb.dataio.dataset.DynamicItemDataset.from_json(json_path)
+    <span class="hljs-comment"># Los ordenamos por duración (default sin ordernar)</span>
+    train_data = train_data.filtered_sorted(sort_key=<span class="hljs-string">&quot;duration&quot;</span>)
+    valid_data = valid_data.filtered_sorted(sort_key=<span class="hljs-string">&quot;duration&quot;</span>)
+    test_data = test_data.filtered_sorted(sort_key=<span class="hljs-string">&quot;duration&quot;</span>)
+    datasets = [train_data, valid_data, test_data]
+    <span class="hljs-comment"># Pipeline de los wav</span>
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">audio_pipeline</span>(<span class="hljs-params">wav</span>):
+        sig = sb.dataio.dataio.read_audio(wav)
+        <span class="hljs-keyword">return</span> sig
+    sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
+    <span class="hljs-comment"># Pipeline de los labels</span>
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">text_pipeline</span>(<span class="hljs-params">phn</span>):
+        phn_list = phn.strip().split()
+        <span class="hljs-keyword">yield</span> phn_list
+        phn_encoded = sb.dataio.encoder.CTCTextEncoder().encode_sequence_torch(phn_list)
+        <span class="hljs-keyword">yield</span> phn_encoded
+    sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
+
+</code></pre>
+
+</body>
+</html>
