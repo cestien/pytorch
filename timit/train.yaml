@@ -190,4 +190,4 @@ ctc_stats: !name:speechbrain.utils.metric_stats.MetricStats
         reduction: batch
 
 per_stats: !name:speechbrain.utils.metric_stats.ErrorRateStats
-Modificación 1
+Modificación hecha en mafalda
