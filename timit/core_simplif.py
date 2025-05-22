@@ -124,17 +124,7 @@ class Brain:
     >>> brain.fit(range(1), ([torch.rand(10, 10), torch.rand(10, 10)],))
     """
 
-    def __init__(  # noqa: C901
-        self,
-        modules=None,
-        opt_class=None,
-        hparams=None,
-        run_opts=None,
-        checkpointer=None,
-    ):
-        self.optimizers_dict = None
-        self.opt_class = opt_class
-        self.checkpointer = checkpointer
+    def __init__(self,modules=None,opt_class=None,self.optimizers_dict = None):
 
         for arg, default in run_opt_defaults.items():
             if run_opts is not None and arg in run_opts:
@@ -351,53 +341,6 @@ class Brain:
                 self.hparams.output_folder,
             )
 
-    def print_trainable_parameters(self):
-        """Prints the number of trainable parameters in the model."""
-        total_trainable_params = 0
-        total_parameters = 0
-        for parameter in self.modules.parameters():
-            total_parameters += parameter.numel()
-            if parameter.requires_grad:
-                total_trainable_params += parameter.numel()
-        class_name = self.__class__.__name__
-        if total_parameters == 0:
-            logger.warning("The model has no parameters!")
-            logger.info(
-                f"{class_name} Model Statistics:\n"
-                f"* Total Number of Trainable Parameters: {total_trainable_params}\n"
-                f"* Total Number of Parameters: {total_parameters}\n"
-                f"* Trainable Parameters represent {0:.2f}% of the total size."
-            )
-        elif total_trainable_params == 0:
-            logger.warning("The model has no trainable parameters!")
-            formatted_total_params = sb.utils.logger.format_order_of_magnitude(
-                total_parameters
-            )
-            logger.info(
-                f"{class_name} Model Statistics:\n"
-                f"* Total Number of Trainable Parameters: {total_trainable_params}\n"
-                f"* Total Number of Parameters: {formatted_total_params}\n"
-                f"* Trainable Parameters represent {0:.4f}% of the total size."
-            )
-        else:
-            percentage_trainable = (
-                100 * total_trainable_params / total_parameters
-            )
-            formatted_trainable_params = (
-                sb.utils.logger.format_order_of_magnitude(
-                    total_trainable_params
-                )
-            )
-            formatted_total_params = sb.utils.logger.format_order_of_magnitude(
-                total_parameters
-            )
-            logger.info(
-                f"{class_name} Model Statistics:\n"
-                f"* Total Number of Trainable Parameters: {formatted_trainable_params}\n"
-                f"* Total Number of Parameters: {formatted_total_params}\n"
-                f"* Trainable Parameters represent {percentage_trainable:.4f}% of the total size."
-            )
-
     def compute_forward(self, batch, stage):
         """Forward pass, to be overridden by sub-classes.
 
@@ -468,9 +411,7 @@ class Brain:
         """
         pass
 
-    def make_dataloader(
-        self, dataset, stage, ckpt_prefix="dataloader-", **loader_kwargs
-    ):
+    def make_dataloader(self, dataset, stage, ckpt_prefix="dataloader-", **loader_kwargs):
         """Creates DataLoaders for Datasets.
 
         This is used by ``fit()`` and ``evaluate()`` if they just receive
@@ -517,101 +458,8 @@ class Brain:
         -------
         DataLoader for the input dataset
         """
-        # TRAIN stage is handled specially.
-        if stage == sb.Stage.TRAIN:
-            loader_kwargs = self._train_loader_specifics(dataset, loader_kwargs)
-        # This commented-out code block is useful when one can ensure
-        # metric reporting is DDP-valid for VALID & EVAL datasets.
-        # elif self.distributed_launch:
-        #     loader_kwargs = sb.dataio.dataloader.distributed_loader_specifics(
-        #         self.distributed_launch, self.rank, dataset, loader_kwargs
-        #     )
-        dataloader = sb.dataio.dataloader.make_dataloader(
-            dataset, **loader_kwargs
-        )
-
-        if (
-            self.checkpointer is not None
-            and ckpt_prefix is not None
-            and (
-                isinstance(dataloader, SaveableDataLoader)
-                or isinstance(dataloader, LoopedLoader)
-            )
-        ):
-            ckpt_key = ckpt_prefix + stage.name
-            self.checkpointer.add_recoverable(ckpt_key, dataloader)
+        dataloader = sb.dataio.dataloader.make_dataloader(dataset, **loader_kwargs)
         return dataloader
-
-    def _train_loader_specifics(self, dataset, loader_kwargs):
-        sampler = loader_kwargs.get("sampler", None)
-        # Shuffling should really only matter for the train stage. Shuffling
-        # will also lead to more padding in batches if the order was otherwise
-        # sorted by length.
-        shuffle = loader_kwargs.get("shuffle", False)
-        if shuffle and not self.distributed_launch:
-            if sampler is not None:
-                raise ValueError(
-                    "Cannot specify both shuffle=True"
-                    "and a sampler in loader_kwargs"
-                )
-            seed = os.environ.get("SB_GLOBAL_SEED", 563375142)
-            sampler = ReproducibleRandomSampler(dataset, seed=seed)
-            self.train_sampler = sampler
-            loader_kwargs["sampler"] = self.train_sampler
-            # Delete the shuffle flag, since you cannot specify both a sampler and
-            # shuffling:
-            del loader_kwargs["shuffle"]
-
-        # Possibly make a DistributedSampler or a wrapper for some other sampler
-        if self.distributed_launch and not isinstance(dataset, IterableDataset):
-            # sort or not
-            if hasattr(self.hparams, "sorting"):
-                shuffle_ddp = (
-                    self.hparams.sorting == "random"
-                )  # False if 'ascending' or 'descending'
-            else:
-                shuffle_ddp = True
-
-            drop_last = loader_kwargs.get("drop_last", False)
-            # num_replicas arg is equal to world_size
-            # and retrieved automatically within
-            # DistributedSampler obj.
-            if sampler is not None:
-                self.train_sampler = DistributedSamplerWrapper(
-                    sampler,
-                    rank=self.rank,
-                    drop_last=drop_last,
-                    shuffle=shuffle,
-                )
-
-                # with DistributedSamplerWrapper, one must disable shuffling for dataloader
-                loader_kwargs["shuffle"] = False
-                loader_kwargs["sampler"] = self.train_sampler
-            elif loader_kwargs.get("batch_sampler") is None:
-                # no sampler and batch-sampler
-                self.train_sampler = DistributedSampler(
-                    dataset,
-                    rank=self.rank,
-                    shuffle=shuffle_ddp,
-                    drop_last=drop_last,
-                )
-
-                # with DistributedSamplerWrapper, one must disable shuffling for dataloader
-                loader_kwargs["shuffle"] = False
-                loader_kwargs["sampler"] = self.train_sampler
-            else:  # batch_sampler was specified
-                self.train_sampler = DistributedSamplerWrapper(
-                    loader_kwargs.get("batch_sampler", None),
-                    rank=self.rank,
-                    shuffle=shuffle_ddp,
-                )
-                loader_kwargs["batch_sampler"] = self.train_sampler
-        elif self.distributed_launch and isinstance(dataset, IterableDataset):
-            logger.warning(
-                "Cannot automatically solve distributed sampling "
-                "for IterableDataset."
-            )
-        return loader_kwargs
 
     def on_fit_start(self):
         """Gets called at the beginning of ``fit()``, on multiple processes
@@ -620,45 +468,11 @@ class Brain:
         Default implementation compiles the jit modules, initializes
         optimizers, and loads the latest checkpoint to resume training.
         """
-        # Run this *after* starting all processes since jit/compiled modules
-        # cannot be pickled.
-        self._compile()
 
-        # Wrap modules with parallel backend after jit
-        self._wrap_distributed()
+        # Initialize optimizers 
+        opt_class = torch.optim.Adadelta(rho=0.95,lr = 'lr',eps=1.e-8)
 
-        # Initialize optimizers after parameters are configured
-        self.init_optimizers()
-
-        # Load latest checkpoint to resume training if interrupted
-        if self.checkpointer is not None:
-            self.checkpointer.recover_if_possible()
-
-    def init_optimizers(self):
-        """Called during ``on_fit_start()``, initialize optimizers
-        after parameters are fully configured (e.g. DDP, jit).
-
-        The default implementation of this method depends on an optimizer
-        class being passed at initialization that takes only a list
-        of parameters (e.g., a lambda or a partial function definition).
-        This creates a single optimizer that optimizes all trainable params.
-
-        Override this class if there are multiple optimizers.
-        """
-
-        all_params = self.modules.parameters()
-
-        if self.opt_class is not None:
-            if self.remove_vector_weight_decay:
-                all_params = rm_vector_weight_decay(self.modules)
-
-            self.optimizer = self.opt_class(all_params)
-
-            self.optimizers_dict = {"opt_class": self.optimizer}
-
-            if self.checkpointer is not None:
-                self.checkpointer.add_recoverable("optimizer", self.optimizer)
-
+    
     def zero_grad(self, set_to_none=False):
         """Sets the gradients of all optimized ``torch.Tensor``s to zero
         if ``set_to_none=False`` (default) or to None otherwise.
@@ -734,54 +548,6 @@ class Brain:
 
         self.on_fit_batch_end(batch, outputs, loss, should_step)
         return loss.detach().cpu()
-
-    def check_loss_isfinite(self, loss):
-        """Check if the loss is finite.
-
-        If the loss is not finite, log a helpful message and increment the `nonfinite_count`.
-        If the `nonfinite_count` exceeds the `--nonfinite_patience` threshold, stop the training
-        and raise an error.
-
-        This check is particularly useful when the loss becomes NaN or inf, while the
-        parameters and gradients remain finite. It helps prevent getting stuck in an
-        infinite loop during training.
-
-        Arguments
-        ---------
-        loss : tensor
-            The loss tensor after ``backward()`` has been called but
-            before the optimizers ``step()``.
-        """
-        if not torch.isfinite(loss):
-            self.nonfinite_count += 1
-
-            # Check if patience is exhausted
-            if self.nonfinite_count > self.nonfinite_patience:
-                raise ValueError(
-                    "Loss is not finite and patience is exhausted. "
-                    "To debug, wrap `fit()` with "
-                    "autograd's `detect_anomaly()`, e.g.\n\nwith "
-                    "torch.autograd.detect_anomaly():\n\tbrain.fit(...)"
-                )
-            else:
-                logger.warning("Patience not yet exhausted.")
-
-    def check_gradients(self):
-        """Checks if the gradients are finite. If not, it will emit a warning and set them to zero."""
-        for param in self.modules.parameters():
-            if param.requires_grad and param.grad is not None:
-                if not torch.isfinite(param.grad).all():
-                    param.grad = None
-                    logger.warning(
-                        f"Gradients {param.name} contain NaN or Inf. Setting to None."
-                    )
-
-    def freeze_optimizers(self, optimizers):
-        """By default, this method returns the passed optimizers.
-        Override this method if you want to freeze some optimizers
-        during training. To do so, return a of active optimizers.
-        """
-        return optimizers
 
     def optimizers_step(self):
         """Performs a step of gradient descent on the optimizers. This method is called every
@@ -954,37 +720,6 @@ class Brain:
         self.avg_train_loss = 0.0
         self.step = 0
 
-    def _should_save_intra_epoch_ckpt(self, last_ckpt_time, steps_since_ckpt):
-        """Determines if an intra-epoch checkpoint should be saved.
-
-        Returns True if there's a checkpointer and time or steps has exceeded limit.
-        """
-        if self.checkpointer is None:
-            return False
-
-        # Return early if mid-epoch checkpoints are disabled to avoid sync
-        if self.ckpt_interval_minutes <= 0 and self.ckpt_interval_steps <= 0:
-            return False
-
-        # Check if we've run for the requested amount of time
-        elapsed_minutes = (time.time() - last_ckpt_time) / 60.0
-        decision = 0 < self.ckpt_interval_minutes < elapsed_minutes
-
-        # Save after requested # of steps
-        decision = decision or 0 < self.ckpt_interval_steps <= steps_since_ckpt
-
-        # If the program is not distributed, just return
-        if not is_distributed_initialized():
-            return decision
-
-        # Otherwise, broadcast decision to all processes from main (rank 0)
-        # This solves synchronization issues where main gets a different
-        # timing result than the other processes.
-        else:
-            broadcast_list = [decision]
-            torch.distributed.broadcast_object_list(broadcast_list, src=0)
-            return broadcast_list[0]
-
     def _fit_valid(self, valid_set, epoch, enable):
         # Validation stage
         if valid_set is not None:
@@ -1009,112 +744,20 @@ class Brain:
                 self.step = 0
                 self.on_stage_end(Stage.VALID, avg_valid_loss, epoch)
 
-    def fit(
-        self,
-        epoch_counter,
-        train_set,
-        valid_set=None,
-        progressbar=None,
-        train_loader_kwargs={},
-        valid_loader_kwargs={},
-    ):
-        """Iterate epochs and datasets to improve objective.
-
-        Relies on the existence of multiple functions that can (or should) be
-        overridden. The following methods are used and expected to have a
-        certain behavior:
-
-        * ``fit_batch()``
-        * ``evaluate_batch()``
-        * ``update_average()``
-
-        If the initialization was done with distributed_count > 0 and the
-        distributed_backend is ddp, this will generally handle multiprocess
-        logic, like splitting the training data into subsets for each device and
-        only saving a checkpoint on the main process.
-
-        Arguments
-        ---------
-        epoch_counter : iterable
-            Each call should return an integer indicating the epoch count.
-        train_set : Dataset, DataLoader
-            A set of data to use for training. If a Dataset is given, a
-            DataLoader is automatically created. If a DataLoader is given, it is
-            used directly.
-        valid_set : Dataset, DataLoader
-            A set of data to use for validation. If a Dataset is given, a
-            DataLoader is automatically created. If a DataLoader is given, it is
-            used directly.
-        progressbar : bool
-            Whether to display the progress of each epoch in a progressbar.
-        train_loader_kwargs : dict
-            Kwargs passed to `make_dataloader()` for making the train_loader
-            (if train_set is a Dataset, not DataLoader).
-            E.G. batch_size, num_workers.
-            DataLoader kwargs are all valid.
-        valid_loader_kwargs : dict
-            Kwargs passed to `make_dataloader()` for making the valid_loader
-            (if valid_set is a Dataset, not DataLoader).
-            E.g., batch_size, num_workers.
-            DataLoader kwargs are all valid.
-
-        Returns
-        -------
-        None
-        """
-        if self.test_only:
-            logger.info(
-                "Test only mode, skipping training and validation stages."
-            )
-            return
-
-        if not (
-            isinstance(train_set, DataLoader)
-            or isinstance(train_set, LoopedLoader)
-        ):
-            train_set = self.make_dataloader(
-                train_set, stage=sb.Stage.TRAIN, **train_loader_kwargs
-            )
-        if valid_set is not None and not (
-            isinstance(valid_set, DataLoader)
-            or isinstance(valid_set, LoopedLoader)
-        ):
-            valid_set = self.make_dataloader(
-                valid_set,
-                stage=sb.Stage.VALID,
-                ckpt_prefix=None,
-                **valid_loader_kwargs,
-            )
-
+    def fit(self,epoch_counter,train_set,valid_set=None,):
+        if sb.Stage.TRAIN:
+            train_set = self.make_dataloader(train_set, stage=sb.Stage.TRAIN)
+        if sb.Stage.VALID:
+            valid_set = self.make_dataloader(valid_set,stage=sb.Stage.VALID)
+                
         self.on_fit_start()
-
-        if progressbar is None:
-            progressbar = not self.noprogressbar
-
-        # Only show progressbar if requested and main_process
-        enable = progressbar and sb.utils.distributed.if_main_process()
 
         # Iterate epochs
         for epoch in epoch_counter:
-            self._fit_train(train_set=train_set, epoch=epoch, enable=enable)
-            self._fit_valid(valid_set=valid_set, epoch=epoch, enable=enable)
+            self._fit_train(train_set=train_set, epoch=epoch)
+            self._fit_valid(valid_set=valid_set, epoch=epoch)
 
-            # Debug mode only runs a few epochs
-            if (
-                self.debug
-                and epoch == self.debug_epochs
-                or self._optimizer_step_limit_exceeded
-            ):
-                break
-
-    def evaluate(
-        self,
-        test_set,
-        max_key=None,
-        min_key=None,
-        progressbar=None,
-        test_loader_kwargs={},
-    ):
+    def evaluate(self,test_set,max_key=None,min_key=None):
         """Iterate test_set and evaluate brain performance. By default, loads
         the best-performing checkpoint (as recorded using the checkpointer).
 
@@ -1141,12 +784,6 @@ class Brain:
         -------
         average test loss
         """
-        if progressbar is None:
-            progressbar = not self.noprogressbar
-
-        # Only show progressbar if requested and main_process
-        enable = progressbar and sb.utils.distributed.if_main_process()
-
         if not (
             isinstance(test_set, DataLoader)
             or isinstance(test_set, LoopedLoader)
