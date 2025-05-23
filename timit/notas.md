@@ -7,4 +7,3 @@ Notas para poder implementar el código en pytorch.
 def comming_soon():
     pass
 ```
-Ya lo agrego 
