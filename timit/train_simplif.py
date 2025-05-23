@@ -1,3 +1,4 @@
+# Versión de train simplificada
 class ASR_Brain(sb.Brain):
     def on_stage_start(self, stage, epoch):
         "Gets called when a stage (either training, validation, test) starts."
