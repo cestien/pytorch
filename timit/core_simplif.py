@@ -1,5 +1,5 @@
 
-
+# Creación de un core simplificado
 class Brain:
     
     def __init__(self,modules=None):
