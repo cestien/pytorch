@@ -126,65 +126,6 @@ class Brain:
 
     def __init__(self,modules=None,opt_class=None,self.optimizers_dict = None):
 
-        for arg, default in run_opt_defaults.items():
-            if run_opts is not None and arg in run_opts:
-                if hparams is not None and arg in hparams:
-                    logger.info(
-                        "Info: "
-                        + arg
-                        + " arg overridden by command line input to: "
-                        + str(run_opts[arg])
-                    )
-                setattr(self, arg, run_opts[arg])
-            else:
-                # If any arg from run_opt_defaults exist in hparams and
-                # not in command line args "run_opts"
-                if hparams is not None and arg in hparams:
-                    logger.info(
-                        "Info: " + arg + " arg from hparam file is used"
-                    )
-                    setattr(self, arg, hparams[arg])
-                else:
-                    setattr(self, arg, default)
-
-        # Check Python version
-        if not (
-            sys.version_info.major == PYTHON_VERSION_MAJOR
-            and sys.version_info.minor >= PYTHON_VERSION_MINOR
-        ):
-            logger.warning(
-                "Detected Python "
-                + str(sys.version_info.major)
-                + "."
-                + str(sys.version_info.minor)
-                + ". We suggest using SpeechBrain with Python >="
-                + str(PYTHON_VERSION_MAJOR)
-                + "."
-                + str(PYTHON_VERSION_MINOR)
-            )
-
-        # Assume `torchrun` was used if `RANK` and `LOCAL_RANK` are set
-        self.distributed_launch = (
-            os.environ.get("RANK") is not None
-            and os.environ.get("LOCAL_RANK") is not None
-        )
-
-        if self.data_parallel_backend and self.distributed_launch:
-            raise ValueError(
-                "To use data_parallel backend, start your script with:\n\t"
-                "python experiment.py hyperparams.yaml "
-                "--data_parallel_backend=True\n"
-                "To use DDP backend, start your script with:\n\t"
-                "torchrun [args] experiment.py hyperparams.yaml"
-            )
-
-        if self.ckpt_interval_minutes > 0 and self.ckpt_interval_steps > 0:
-            sys.exit(
-                "The options `ckpt_interval_minutes` and `ckpt_interval_steps` "
-                "are mutually exclusive. "
-                "Please keep only one active per experiment run."
-            )
-
         # Set the right device_type
         if self.device == "cpu":
             self.device_type = "cpu"
@@ -192,154 +133,27 @@ class Brain:
             self.device_type = "cuda"
         else:
             raise ValueError("Expected `self.device` to be `cpu` or `cuda`!")
-
         # Switch to the right context
         if self.device == "cuda":
             torch.cuda.set_device(0)
         elif "cuda" in self.device:
             torch.cuda.set_device(int(self.device[-1]))
-
-        # Put modules on the right device, accessible with dot notation
+        
+        modules = [sb.lobes.models.CRDNN.CRDNN(), sb.nnet.linear.Linear(), 
+                   sb.processing.features.InputNormalization(global)]
         self.modules = torch.nn.ModuleDict(modules).to(self.device)
-
-        # The next line ensures that both tensors marked as parameters and standard tensors,
-        # such as those used in InputNormalization, are placed on the right device.
-        for module in self.modules:
-            if hasattr(self.modules[module], "to"):
-                self.modules[module] = self.modules[module].to(self.device)
-
-        # Make hyperparams available with dot notation too
-        if hparams is not None:
-            self.hparams = SimpleNamespace(**hparams)
-
-        # Checkpointer should point at a temporary directory in debug mode
-        if (
-            self.debug
-            and not self.debug_persistently
-            and self.checkpointer is not None
-            and hasattr(self.checkpointer, "checkpoints_dir")
-        ):
-            tempdir = tempfile.TemporaryDirectory()
-            logger.info(
-                "Since debug mode is active, switching checkpointer "
-                f"output to temporary directory: {tempdir.name}"
-            )
-            self.checkpointer.checkpoints_dir = pathlib.Path(tempdir.name)
-
-            # Keep reference to tempdir as long as checkpointer exists
-            self.checkpointer.tempdir = tempdir
-
-        # Sampler should be handled by `make_dataloader`
-        # or if you provide a DataLoader directly, you can set
-        # this.train_sampler = your_sampler
-        # to have your_sampler.set_epoch() called on each epoch.
-        self.train_sampler = None
-
-        if self.auto_mix_prec:
-            logger.warning(
-                "The option `--auto_mix_prec` is deprecated and will be removed in the future. "
-                "Please use `--precision=fp16` instead."
-            )
-            self.precision = "fp16"
-
-        if self.bfloat16_mix_prec:
-            logger.warning(
-                "The option `--bfloat16_mix_prec` is deprecated and will be removed in the future. "
-                "Please use `--precision=bf16` instead."
-            )
-            self.precision = "bf16"
-
-        if self.device_type == "cpu" and (
-            self.precision == "fp16" or self.eval_precision == "fp16"
-        ):
-            raise ValueError(
-                "The option `--precision` or `--eval_precision` is set to fp16. "
-                "This option is not yet supported on CPU. "
-                "Please use `--precision=bf16` or `--eval_precision=bf16` instead "
-                "to enable mixed precision on CPU."
-            )
-
-        gradscaler_enabled = (
-            self.precision == "fp16" and self.device_type == "cuda"
-        )
-        if self.skip_nonfinite_grads and gradscaler_enabled:
-            logger.warning(
-                "The option `skip_nonfinite_grads` will be ignored "
-                "because GradScaler is enabled and will automatically "
-                "skip nonfinite gradients."
-            )
-
-        logger.info(f"Gradscaler enabled: `{gradscaler_enabled}`")
-        logger.info(f"Using training precision: `--precision={self.precision}`")
-        logger.info(
-            f"Using evaluation precision: `--eval_precision={self.eval_precision}`"
-        )
-        if version.parse(torch.__version__) < version.parse("2.4.0"):
-            self.scaler = torch.cuda.amp.GradScaler(enabled=gradscaler_enabled)
-        else:
-            self.scaler = torch.GradScaler(
-                self.device, enabled=gradscaler_enabled
-            )
-
-        train_dtype = AMPConfig.from_name(self.precision).dtype
-        self.training_ctx = TorchAutocast(
-            device_type=self.device_type, dtype=train_dtype
-        )
-        eval_dtype = AMPConfig.from_name(self.eval_precision).dtype
-        self.evaluation_ctx = TorchAutocast(
-            device_type=self.device_type, dtype=eval_dtype
-        )
-        if gradscaler_enabled and self.checkpointer is not None:
-            self.checkpointer.add_recoverable(
-                "scaler", self.scaler, optional_load=True
-            )
-
-        # List parameter count for the user
-        self.print_trainable_parameters()
-
-        if self.distributed_launch:
-            self.rank = int(os.environ["RANK"])
-            if not is_distributed_initialized():
-                if self.rank > 0:
-                    raise ValueError(
-                        " ================ WARNING ==============="
-                        "Please add sb.ddp_init_group() into your exp.py"
-                        "To use DDP backend, start your script with:\n\t"
-                        "torchrun [args] experiment.py hyperparams.yaml"
-                    )
-                else:
-                    logger.warning(
-                        "To use DDP, please add "
-                        "sb.utils.distributed.ddp_init_group() into your exp.py"
-                    )
-                    logger.info(
-                        "Only the main process is alive, "
-                        "all other subprocess were killed."
-                    )
 
         # Prepare iterating variables
         self.avg_train_loss = 0.0
         self.step = 0
         self.optimizer_step = 0
 
-        # Add this class to the checkpointer for intra-epoch checkpoints
-        if self.checkpointer is not None:
-            self.checkpointer.add_recoverable("brain", self)
-
-        # Force default color for tqdm progressbar
-        if not self.tqdm_colored_bar:
-            self.tqdm_barcolor = dict.fromkeys(self.tqdm_barcolor, "")
-
         # Profiler setup
         self.profiler = None
         if self.profile_training:
             logger.info("Pytorch profiler has been activated.")
             self.tot_prof_steps = (self.profile_steps + self.profile_warmup) - 1
-            self.profiler = prepare_profiler(
-                self.profile_warmup,
-                self.profile_steps,
-                self.hparams.output_folder,
-            )
+        self.profiler = sb.utils.profiling.prepare_profiling()
 
     def compute_forward(self, batch, stage):
         """Forward pass, to be overridden by sub-classes.
@@ -381,35 +195,6 @@ class Brain:
         raise NotImplementedError
         return
 
-    def on_stage_start(self, stage, epoch=None):
-        """Gets called when a stage starts.
-
-        Useful for defining class variables used during the stage.
-
-        Arguments
-        ---------
-        stage : Stage
-            The stage of the experiment: Stage.TRAIN, Stage.VALID, Stage.TEST
-        epoch : int
-            The current epoch count.
-        """
-        pass
-
-    def on_stage_end(self, stage, stage_loss, epoch=None):
-        """Gets called at the end of a stage.
-
-        Useful for computing stage statistics, saving checkpoints, etc.
-
-        Arguments
-        ---------
-        stage : Stage
-            The stage of the experiment: Stage.TRAIN, Stage.VALID, Stage.TEST
-        stage_loss : float
-            The average loss over the completed stage.
-        epoch : int
-            The current epoch count.
-        """
-        pass
 
     def make_dataloader(self, dataset, stage, ckpt_prefix="dataloader-", **loader_kwargs):
         """Creates DataLoaders for Datasets.
@@ -655,70 +440,6 @@ class Brain:
             loss = self.compute_objectives(out, batch, stage=stage)
         return loss.detach().cpu()
 
-    def _fit_train(self, train_set, epoch, enable):
-        # Training stage
-        self.on_stage_start(Stage.TRAIN, epoch)
-        self.modules.train()
-        self.zero_grad()
-
-        # Reset nonfinite count to 0 each epoch
-        self.nonfinite_count = 0
-
-        if self.train_sampler is not None and hasattr(
-            self.train_sampler, "set_epoch"
-        ):
-            self.train_sampler.set_epoch(epoch)
-
-        # Time since last intra-epoch checkpoint
-        last_ckpt_time = time.time()
-        steps_since_ckpt = 0
-        with tqdm(
-            train_set,
-            initial=self.step,
-            dynamic_ncols=True,
-            disable=not enable,
-            colour=self.tqdm_barcolor["train"],
-        ) as t:
-            if self.profiler is not None:
-                self.profiler.start()
-            for batch in t:
-                if self._optimizer_step_limit_exceeded:
-                    logger.info("Train iteration limit exceeded")
-                    break
-                self.step += 1
-                steps_since_ckpt += 1
-                loss = self.fit_batch(batch)
-                self.avg_train_loss = self.update_average(
-                    loss, self.avg_train_loss
-                )
-                t.set_postfix(train_loss=self.avg_train_loss)
-
-                if self.profiler is not None:
-                    self.profiler.step()
-                    if self.profiler.step_num > self.tot_prof_steps:
-                        logger.info(
-                            "The profiler finished, training is stopped."
-                        )
-                        self.profiler.stop()
-                        quit()
-
-                # Debug mode only runs a few batches
-                if self.debug and self.step == self.debug_batches:
-                    break
-
-                if self._should_save_intra_epoch_ckpt(
-                    last_ckpt_time, steps_since_ckpt
-                ):
-                    # Checkpointer class will handle running this on main only
-                    self._save_intra_epoch_ckpt()
-                    last_ckpt_time = time.time()
-                    steps_since_ckpt = 0
-
-        # Run train "on_stage_end" on all processes
-        self.zero_grad(set_to_none=True)  # flush gradients
-        self.on_stage_end(Stage.TRAIN, self.avg_train_loss, epoch)
-        self.avg_train_loss = 0.0
-        self.step = 0
 
     def _fit_valid(self, valid_set, epoch, enable):
         # Validation stage
@@ -750,12 +471,25 @@ class Brain:
         if sb.Stage.VALID:
             valid_set = self.make_dataloader(valid_set,stage=sb.Stage.VALID)
                 
-        self.on_fit_start()
-
+        optimizer = torch.optim.Adadelta(rho=0.95,lr = 'lr',eps=1.e-8)
         # Iterate epochs
         for epoch in epoch_counter:
-            self._fit_train(train_set=train_set, epoch=epoch)
-            self._fit_valid(valid_set=valid_set, epoch=epoch)
+            # Training stage
+            self.on_stage_start(Stage.TRAIN, epoch)
+            self.modules.train()
+            self.zero_grad()
+            for batch in train_set:
+                self.step += 1
+                loss = self.fit_batch(batch)
+                self.avg_train_loss = self.update_average(loss, self.avg_train_loss)
+                self.profiler.step()
+            # Run train "on_stage_end" on all processes
+            self.zero_grad(set_to_none=True)  # flush gradients
+            self.on_stage_end(Stage.TRAIN, self.avg_train_loss, epoch)
+            self.avg_train_loss = 0.0
+            self.step = 0
+            # Validation step
+            self._fit_valid(valid_set=valid_set, epoch=epoch) <--------vamos por acá, hay que reemplazar esto
 
     def evaluate(self,test_set,max_key=None,min_key=None):
         """Iterate test_set and evaluate brain performance. By default, loads
