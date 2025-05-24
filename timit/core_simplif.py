@@ -62,62 +62,11 @@ class Brain:
         with open(path, "w", encoding="utf-8") as w:
             w.write(yaml.dump(save_dict))
 
-
-    def make_dataloader(self, dataset):
-        """Creates DataLoaders for Datasets.
-
-        This is used by ``fit()`` and ``evaluate()`` if they just receive
-        Datasets.
-
-        Alternatively, this can be called from outside the Brain subclass.
-        In that case, the DataLoader should be passed to ``fit()`` in place
-        of the dataset.
-
-        The Stage.TRAIN DataLoader is handled specially. It has extra args for
-        shuffle and drop_last. In DDP a DistributedSampler is created (unless
-        the dataset is an IterableDataset).
-
-        NOTE
-        ----
-        Some important DataLoader arguments are passed via **loader_kwargs,
-        e.g., batch_size, num_workers, pin_memory.
-
-        NOTE
-        ----
-        By default, ``evaluate()`` specifies ckpt_prefix=None to stop the test
-        DataLoader being added to the checkpointer. If you need to add a
-        recoverable after saving checkpoints (e.g., at test time, after
-        checkpointing the training), and still be able to recover reasonably,
-        you should probably specify ``allow_partial_load=True``.
-
-        Arguments
-        ---------
-        dataset : Dataset
-            A set of data to use to create data loader. If the Dataset is a
-            DynamicItemDataset, PaddedBatch is used as the default collate_fn,
-            unless specified in loader_kwargs.
-        stage : Stage
-            The stage of the experiment: Stage.TRAIN, Stage.VALID, Stage.TEST
-        ckpt_prefix : str, None
-            Prefix to use for SaveableDataLoader Checkpoint name. The Stage
-            name is added to this to create the full key. Set to None to not
-            save the DataLoader.
-        **loader_kwargs : dict
-            Additional keyword arguments to the DataLoader.
-            E.g., batch_size, num_workers, pin_memory.
-
-        Returns
-        -------
-        DataLoader for the input dataset
-        """
-        dataloader = sb.dataio.dataloader.make_dataloader(dataset, **loader_kwargs)
-        return dataloader
-
     def fit(self,epoch_counter,train_set,valid_set=None,):
         if sb.Stage.TRAIN:
-            train_set = self.make_dataloader(train_set, stage=sb.Stage.TRAIN)
+            train_set = sb.dataio.dataloader.make_dataloader(train_set, stage=sb.Stage.TRAIN)
         if sb.Stage.VALID:
-            valid_set = self.make_dataloader(valid_set,stage=sb.Stage.VALID)
+            valid_set = sb.dataio.dataloader.make_dataloader(valid_set,stage=sb.Stage.VALID)
                 
         optimizer = torch.optim.Adadelta(rho=0.95,lr = 'lr',eps=1.e-8)
         # Iterate epochs
