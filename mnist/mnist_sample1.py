@@ -44,6 +44,8 @@ class WrappedDataLoader():
     def __len__(self): return len(self.dl)
 
     def __iter__(self):
-        batches = iter(self.dl)
-        for b in batches: yield(self.func(*b))
+        #batches = iter(self.dl)
+        for b in self.dl: 
+            au = self.func(*b)
+            yield(au)
 
