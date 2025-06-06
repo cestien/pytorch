@@ -43,9 +43,85 @@
 </ul>
 </li>
 </ul>
-<p dir="auto">Notas para poder implementar el código en pytorch.</p>
-<pre><code class="code-line language-python" dir="auto"><span class="hljs-keyword">def</span> <span class="hljs-title function_">comming_soon</span>():
-    <span class="hljs-keyword">pass</span>
+<h3 dir="auto" id="ejemplo-para-el-caso-de-mnist">Ejemplo para el caso de MNIST</h3>
+<pre><code class="code-line language-python" dir="auto"><span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
+<span class="hljs-keyword">import</span> torch
+<span class="hljs-keyword">import</span> torch.nn.functional <span class="hljs-keyword">as</span> F
+<span class="hljs-keyword">from</span> torch <span class="hljs-keyword">import</span> nn,optim,tensor
+<span class="hljs-keyword">from</span> torch.utils.data <span class="hljs-keyword">import</span> TensorDataset, DataLoader
+<span class="hljs-keyword">import</span> pickle, gzip
+
+dev = torch.device(<span class="hljs-string">&#x27;cuda&#x27;</span>) <span class="hljs-keyword">if</span> torch.cuda.is_available() <span class="hljs-keyword">else</span> torch.device(<span class="hljs-string">&#x27;cpu&#x27;</span>)
+
+<span class="hljs-comment"># Entrenamiento y validación</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">fit</span>(<span class="hljs-params">epochs, model, loss_func, opt, train_dl, valid_dl</span>):
+    <span class="hljs-keyword">for</span> epoch <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(epochs):
+        <span class="hljs-comment"># Entrenamiento</span>
+        model.train()
+        <span class="hljs-keyword">for</span> xb,yb <span class="hljs-keyword">in</span> train_dl: 
+            pb = model(xb)
+            loss = loss_func(pb,yb)  
+            loss.backward()
+            opt.step()
+            opt.zero_grad()
+        <span class="hljs-comment"># Validación</span>
+        model.<span class="hljs-built_in">eval</span>()
+        losses = <span class="hljs-built_in">list</span>()
+        nums = <span class="hljs-built_in">list</span>()
+        <span class="hljs-keyword">with</span> torch.no_grad():
+            <span class="hljs-keyword">for</span> xb,yb <span class="hljs-keyword">in</span> valid_dl:
+                pb = model(xb)
+                loss  = loss_func(pb,yb)
+                num = <span class="hljs-built_in">len</span>(xb)
+                losses.append(loss.item())
+                nums.append(num)
+        val_loss = np.<span class="hljs-built_in">sum</span>(np.multiply(losses,nums)) / np.<span class="hljs-built_in">sum</span>(nums)
+        <span class="hljs-built_in">print</span>(epoch, val_loss)
+
+<span class="hljs-comment"># Modifica las dimensiones de las features x</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Convert_x</span>():
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, dl</span>):
+        self.dl = dl
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__len__</span>(<span class="hljs-params">self</span>): <span class="hljs-keyword">return</span> <span class="hljs-built_in">len</span>(self.dl)
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__iter__</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-comment"># batches = iter(self.dl)</span>
+        <span class="hljs-keyword">for</span> b <span class="hljs-keyword">in</span> self.dl:
+            xp = b[<span class="hljs-number">0</span>].view(-<span class="hljs-number">1</span>,<span class="hljs-number">1</span>,<span class="hljs-number">28</span>,<span class="hljs-number">28</span>).to(dev)
+            yp = b[<span class="hljs-number">1</span>].to(dev)
+            <span class="hljs-keyword">yield</span> xp, yp
+            
+<span class="hljs-comment"># Convierte el dataset en grupos de batches</span>
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_dataloader</span>(<span class="hljs-params">x,y,bs,shuffle</span>):
+    ds = TensorDataset(*<span class="hljs-built_in">map</span>(tensor, (x,y)))
+    dl = DataLoader(ds, batch_size=bs, shuffle=shuffle)
+    dlp = Convert_x(dl)
+    <span class="hljs-keyword">return</span> dlp
+
+<span class="hljs-comment"># Aplana los datos de la feature x. La usa nn.Sequential</span>
+<span class="hljs-keyword">class</span> <span class="hljs-title class_">Aplanar</span>(nn.Module):
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self</span>):
+        <span class="hljs-built_in">super</span>().__init__() <span class="hljs-comment"># Llamada al constructor de la clase padre</span>
+    <span class="hljs-keyword">def</span> <span class="hljs-title function_">forward</span>(<span class="hljs-params">self, x</span>):
+        <span class="hljs-keyword">return</span> x.view(x.size(<span class="hljs-number">0</span>),-<span class="hljs-number">1</span>)
+
+<span class="hljs-comment"># Main</span>
+bs=<span class="hljs-number">64</span>
+lr=<span class="hljs-number">0.1</span>
+epochs=<span class="hljs-number">4</span>
+<span class="hljs-keyword">with</span> gzip.<span class="hljs-built_in">open</span>(<span class="hljs-string">&#x27;data/mnist.pkl.gz&#x27;</span>, <span class="hljs-string">&#x27;rb&#x27;</span>) <span class="hljs-keyword">as</span> f:
+    ((train_x, train_y), (valid_x, valid_y), _) = pickle.load(f, encoding=<span class="hljs-string">&#x27;latin-1&#x27;</span>)
+model = nn.Sequential(
+    nn.Conv2d(<span class="hljs-number">1</span>,  <span class="hljs-number">16</span>, kernel_size=<span class="hljs-number">3</span>, stride=<span class="hljs-number">2</span>, padding=<span class="hljs-number">1</span>), nn.ReLU(),
+    nn.Conv2d(<span class="hljs-number">16</span>, <span class="hljs-number">16</span>, kernel_size=<span class="hljs-number">3</span>, stride=<span class="hljs-number">2</span>, padding=<span class="hljs-number">1</span>), nn.ReLU(),
+    nn.Conv2d(<span class="hljs-number">16</span>, <span class="hljs-number">10</span>, kernel_size=<span class="hljs-number">3</span>, stride=<span class="hljs-number">2</span>, padding=<span class="hljs-number">1</span>), nn.ReLU(),
+    nn.AdaptiveAvgPool2d(<span class="hljs-number">1</span>),
+    Aplanar()
+).to(dev)
+loss_func = F.cross_entropy
+opt = optim.SGD(model.parameters(), lr=lr, momentum=<span class="hljs-number">0.9</span>)
+train_dl = get_dataloader(train_x, train_y, bs,   shuffle=<span class="hljs-literal">False</span>)
+valid_dl = get_dataloader(valid_x, valid_y, bs*<span class="hljs-number">2</span>, shuffle=<span class="hljs-literal">True</span> )
+fit(epochs, model, loss_func, opt, train_dl, valid_dl)
 </code></pre>
 
 </body>
