@@ -119,10 +119,17 @@ model = nn.Sequential(
 ).to(dev)
 loss_func = F.cross_entropy
 opt = optim.SGD(model.parameters(), lr=lr, momentum=<span class="hljs-number">0.9</span>)
-train_dl = get_dataloader(train_x, train_y, bs,   shuffle=<span class="hljs-literal">False</span>)
-valid_dl = get_dataloader(valid_x, valid_y, bs*<span class="hljs-number">2</span>, shuffle=<span class="hljs-literal">True</span> )
+train_dl = get_dataloader(train_x, train_y, bs,   shuffle=<span class="hljs-literal">True</span>)
+valid_dl = get_dataloader(valid_x, valid_y, bs*<span class="hljs-number">2</span>, shuffle=<span class="hljs-literal">False</span> )
 fit(epochs, model, loss_func, opt, train_dl, valid_dl)
 </code></pre>
+<h2 dir="auto" id="reconocedor-simple-de-fonemas-usando-timit">Reconocedor simple de fonemas usando TIMIT</h2>
+<h4 dir="auto" id="preparaci%C3%B3n-de-los-datos">Preparación de los datos</h4>
+<ul dir="auto">
+<li dir="auto">A partir de los json determinar los pares (wav, transcripción) del train, valid y test datasets. Cada transcripción es una lista de fonos codificados.</li>
+<li dir="auto">Ordenar los datasets por duración de mayor a menor</li>
+<li dir="auto">Usando dataloader separar los datos en batches con el correspondiente padding. Cuando se construye el conjunto de train hay que poner shuffle=True, de esta manera en cada epoch todos los datos de train se reordenan aleatoriamente antes de ser separados nuevamente en batches. El bs de validación puede ser más grande que el de train ya que no hay que tocar el modelo.</li>
+</ul>
 
 </body>
 </html>
