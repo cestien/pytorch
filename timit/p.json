@@ -1,0 +1,27 @@
+
+{
+  "mrws1_sx320": {
+    "wav": "/dbase/timit/test/dr5/mrws1/sx320.wav",
+    "duration": 3.28325,
+    "spk_id": "mrws1",
+    "phn": "sil dh ih n ih r ih s ih n ih sil g aa sil m ey n aa sil b iy w ih th ih n w aa sil k ih ng sil d ih s sil t ih n sil s sil",
+    "wrd": "the nearest synagogue may not be within walking distance",
+    "ground_truth_phn_ends": "2360 2840 3216 4511 5556 7018 7880 10440 11160 12040 13160 13960 14200 17640 18280 19160 20360 21560 23800 25320 25720 26520 27800 28825 30440 31248 32208 34130 35880 36760 37640 37960 39101 40120 40360 41640 43000 43320 44200 44440 45280 46680 49560 52480"
+  },
+  "mrws1_sx230": {
+    "wav": "/dbase/timit/test/dr5/mrws1/sx230.wav",
+    "duration": 3.2064375,
+    "spk_id": "mrws1",
+    "phn": "sil ah l aw l iy w ey hh iy er sil b ah r ae sh sil n l ay z aa l eh r er z sil",
+    "wrd": "allow leeway here but rationalize all errors",
+    "ground_truth_phn_ends": "3000 3592 4600 8605 10402 12360 13618 16280 17169 18757 20469 23000 23443 24520 26402 28600 30160 30600 31400 32360 35800 36360 38809 40040 41650 42945 46120 48600 51280"
+  },
+  "mrws1_sx50": {
+    "wav": "/dbase/timit/test/dr5/mrws1/sx50.wav",
+    "duration": 3.232,
+    "spk_id": "mrws1",
+    "phn": "sil k ae dx ih s sil t r aa f ih sil k iy sil k ih n aa m ih sil k ah sil b ae sil k s sil n ih sil g l eh sil dh ah sil p aa r sil",
+    "wrd": "catastrophic economic cutbacks neglect the poor",
+    "ground_truth_phn_ends": "2040 3080 4428 4720 5880 7480 7880 8600 9293 10680 12040 13000 13953 14680 15640 16680 17348 18200 18966 20762 21840 22520 23800 25080 26318 28880 29240 31160 32279 32584 33520 34360 34920 35926 37000 37472 38200 39644 42234 42760 43240 44840 45720 48333 49640 51680"
+  }
+}
