@@ -105,3 +105,5 @@ fit(epochs, model, loss_func, opt, train_dl, valid_dl)
   - A partir de los json determinar los pares (wav, transcripción) del train, valid y test datasets. Cada transcripción es una lista de fonos codificados. 
   - Ordenar los datasets por duración de mayor a menor
   - Usando dataloader separar los datos en batches con el correspondiente padding. Cuando se construye el conjunto de train hay que poner shuffle=True, de esta manera en cada epoch todos los datos de train se reordenan aleatoriamente antes de ser separados nuevamente en batches. El bs de validación puede ser más grande que el de train ya que no hay que tocar el modelo.
+  - Los labels que devuelve el json son codificados en enteros. Para eso se usa el método `load_phoneme_vocabulary` el cual genera dos diccionarios para codificar y decodificar.
+  
