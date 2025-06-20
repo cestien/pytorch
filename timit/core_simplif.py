@@ -25,7 +25,7 @@ class Brain:
         self.avg_train_loss = 0.0
         self.step = 0
         self.optimizer_step = 0
-
+ 
         # Profiler setup
         self.profiler = None
         if self.profile_training:
