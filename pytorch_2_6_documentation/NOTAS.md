@@ -58,3 +58,29 @@ Primero estaría bueno ver este curso [Practical deep learning](https://course.f
   - **Python API Reference**. Contiene todas las funciones que necesitamos.
   - **Python Prototype API Reference**.
 
+## Augmenter de datos
+En speechbrain:
+  - augmenter es una función que define como agregar los datos aumentados
+  - freq_domain
+    - randomshift
+    - spectrogramdrop
+    - warping
+  - preparation module
+    - prepare csv
+    - prepare datasete from url
+    - write csv
+  - time domain
+    - AddNoise
+    - AddReverb
+    - ChannelDrop
+    - ChannelSwap
+    - CutCat
+    - DoClip
+    - DropBitResolution
+    - DropChunk
+    - DropFreq
+    - FastDropChunk
+    - RandAmp
+    - Resample
+    - SignFlip
+    - SpeedPerturb
