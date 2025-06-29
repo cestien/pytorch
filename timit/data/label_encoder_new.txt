@@ -38,6 +38,3 @@
 'uh' => 37
 'oy' => 38
 '<blank>' => 0
-================
-'starting_index' => 0
-'blank_label' => '<blank>'
