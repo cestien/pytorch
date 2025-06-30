@@ -112,9 +112,9 @@ fit(epochs, model, loss_func, opt, train_dl, valid_dl)
 #### La clase `torch.nn.Conv1d`
   - La entrada tiene dimensión $(N,CI,LI)$ donde $N$ es el batch size, $LI$ es la longitud de la señal en frames (la máxima si no son iguales y el resto del batch se lleva a la máxima completando con ceros). $CI$ es la cantidad de canales de entrada (por ejemplo el número de filtros en escala mel).
   - La salida tiene dimensión $(N,CO,LO)$. $LO$ es la longitud de salida en frames que podría ser distinta a $LI$ como resultado de la convolución y el polling. $CO$ es la cantidad de canales de salida. 
-  - Tenemos un conjunto de $CO\times CI$ de kernels de convolución de dimensión $KS$ 
+  - Cada kernel tiene  dimensión $K$, el conjunto de todos los kernel tendrá dimensión $(C0, CI, K)$. 
   - La salida $Y$ del canal $j$ para la entrada $X$ del batch $i$  vendrá dada por:
   $$
-  out(N_i,CO_{j}) = \text{bias}(CO_{j}) + \sum_{k=0}^{CI-1}\text{kernel}(CO_j,k)*X(N_i,k)
+  Y(N_i,CO_{j}) = \text{bias}(CO_{j}) + \sum_{k=0}^{CI-1}\text{kernel}(CO_j,k)*X(N_i,k)
   $$  
-  Es decir, tenemos un conjunto $CO$ de kernels de convolución. Tomamos el kernel $j$ y lo convolucionamos con la entrada $X$ del batch $i$
+  
