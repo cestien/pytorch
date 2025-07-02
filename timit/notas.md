@@ -118,3 +118,19 @@ fit(epochs, model, loss_func, opt, train_dl, valid_dl)
   Y(N_i,CO_{j}) = \text{bias}(CO_{j}) + \sum_{k=0}^{CI-1}\text{kernel}(CO_j,k)*X(N_i,k)
   $$  
   
+  #### La clase `CNN_block`
+  Implementa una sequencia convolución, layer normalization, leaky relu, max pool y drop out  
+
+  ```python
+  CNN_block(
+  (bloque_cnn): Sequential(
+    (0): Conv1d(80, 64, kernel_size=(3,), stride=(1,), padding=(1,), padding_mode=replicate)
+    (1): Transpose()
+    (2): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
+    (3): Transpose()
+    (4): LeakyReLU(negative_slope=0.01)
+    (5): MaxPool1d(kernel_size=2, stride=1, padding=0, dilation=1, ceil_mode=False)
+    (6): Dropout(p=0.1, inplace=False)
+  )
+)
+```
