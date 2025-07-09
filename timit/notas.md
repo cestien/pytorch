@@ -19,92 +19,14 @@ Dado:
       - Paso de optimización: Cambiar los parámetros $W$ por los los nuevos parámetros $W -= \eta\nabla_W L(W)$
       - Resetear los gradientes acumulados $\nabla_W F(W) = 0$ 
 
-### Ejemplo para el caso de MNIST
-```python
-import numpy as np
-import torch
-import torch.nn.functional as F
-from torch import nn,optim,tensor
-from torch.utils.data import TensorDataset, DataLoader
-import pickle, gzip
-
-dev = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-
-# Entrenamiento y validación
-def fit(epochs, model, loss_func, opt, train_dl, valid_dl):
-    for epoch in range(epochs):
-        # Entrenamiento
-        model.train()
-        for xb,yb in train_dl: 
-            pb = model(xb)
-            loss = loss_func(pb,yb)  
-            loss.backward()
-            opt.step()
-            opt.zero_grad()
-        # Validación
-        model.eval()
-        losses = list()
-        nums = list()
-        with torch.no_grad():
-            for xb,yb in valid_dl:
-                pb = model(xb)
-                loss  = loss_func(pb,yb)
-                num = len(xb)
-                losses.append(loss.item())
-                nums.append(num)
-        val_loss = np.sum(np.multiply(losses,nums)) / np.sum(nums)
-        print(epoch, val_loss)
-
-# Modifica las dimensiones de las features x
-class Convert_x():
-    def __init__(self, dl):
-        self.dl = dl
-    def __len__(self): return len(self.dl)
-    def __iter__(self):
-        # batches = iter(self.dl)
-        for b in self.dl:
-            xp = b[0].view(-1,1,28,28).to(dev)
-            yp = b[1].to(dev)
-            yield xp, yp
-            
-# Convierte el dataset en grupos de batches
-def get_dataloader(x,y,bs,shuffle):
-    ds = TensorDataset(*map(tensor, (x,y)))
-    dl = DataLoader(ds, batch_size=bs, shuffle=shuffle)
-    dlp = Convert_x(dl)
-    return dlp
-
-# Aplana los datos de la feature x. La usa nn.Sequential
-class Aplanar(nn.Module):
-    def __init__(self):
-        super().__init__() # Llamada al constructor de la clase padre
-    def forward(self, x):
-        return x.view(x.size(0),-1)
-
-# Main
-bs=64
-lr=0.1
-epochs=4
-with gzip.open('data/mnist.pkl.gz', 'rb') as f:
-    ((train_x, train_y), (valid_x, valid_y), _) = pickle.load(f, encoding='latin-1')
-model = nn.Sequential(
-    nn.Conv2d(1,  16, kernel_size=3, stride=2, padding=1), nn.ReLU(),
-    nn.Conv2d(16, 16, kernel_size=3, stride=2, padding=1), nn.ReLU(),
-    nn.Conv2d(16, 10, kernel_size=3, stride=2, padding=1), nn.ReLU(),
-    nn.AdaptiveAvgPool2d(1),
-    Aplanar()
-).to(dev)
-loss_func = F.cross_entropy
-opt = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-train_dl = get_dataloader(train_x, train_y, bs,   shuffle=True)
-valid_dl = get_dataloader(valid_x, valid_y, bs*2, shuffle=False )
-fit(epochs, model, loss_func, opt, train_dl, valid_dl)
-```
 ## Reconocedor simple de fonemas usando TIMIT
 #### Preparación de los datos
   - A partir de los json determinar los pares (wav, transcripción) del train, valid y test datasets. Cada transcripción es una lista de fonos codificados. 
-  - Ordenar los datasets por duración de mayor a menor
-  - Usando dataloader separar los datos en batches con el correspondiente padding. Cuando se construye el conjunto de train hay que poner shuffle=True, de esta manera en cada epoch todos los datos de train se reordenan aleatoriamente antes de ser separados nuevamente en batches. El bs de validación puede ser más grande que el de train ya que no hay que tocar el modelo.
+  - Luego usamos la técnica *shuffle global sort local* que consiste en:
+    - **Shuffle global**: Desordenar el dataset globalmente en cada epoch. Esto se hace en pytorch seteando `suffle=True` en el Dataloader
+    - **Sort local**: Ordenar las secuencias por longitud dentro de cada batch. y luego padearlas. Ambas cosas se hacen dentro de  la collate_fn. 
+  - En el conjunto de validación y de test la parte de shuffle global se desactiva pero no la de sort local.
+  - El bs de validación puede ser más grande que el de train ya que no hay que tocar el modelo.
   - Los labels que devuelve el json son codificados en enteros. Para eso se usa el método `load_phoneme_vocabulary` el cual genera dos diccionarios para codificar y decodificar.
   
 ### Bloque de convolución
@@ -117,20 +39,23 @@ fit(epochs, model, loss_func, opt, train_dl, valid_dl)
   $$
   Y(N_i,CO_{j}) = \text{bias}(CO_{j}) + \sum_{k=0}^{CI-1}\text{kernel}(CO_j,k)*X(N_i,k)
   $$  
-  
-  #### La clase `CNN_block`
-  Implementa una sequencia convolución, layer normalization, leaky relu, max pool y drop out  
 
-  ```python
-  CNN_block(
-  (bloque_cnn): Sequential(
-    (0): Conv1d(80, 64, kernel_size=(3,), stride=(1,), padding=(1,), padding_mode=replicate)
-    (1): Transpose()
-    (2): LayerNorm((64,), eps=1e-05, elementwise_affine=True)
-    (3): Transpose()
-    (4): LeakyReLU(negative_slope=0.01)
-    (5): MaxPool1d(kernel_size=2, stride=1, padding=0, dilation=1, ceil_mode=False)
-    (6): Dropout(p=0.1, inplace=False)
-  )
-)
-```
+Para la mayoría de los casos generales y para asegurar una buena generalización, la estrategia de "shuffle global, sort local dentro del batch" (es decir, DataLoader(..., shuffle=True, collate_fn=custom_collate_fn)) es la más recomendada. Permite la eficiencia del padding sin sacrificar la aleatoriedad necesaria para la generalización.
+  
+1. Desordenar (Shuffle) el Dataset Globalmente en Cada Época:
+
+    Propósito: Generalización y evitar sobreajuste (overfitting). Si el modelo siempre ve los mismos datos en el mismo orden, podría aprender patrones específicos de ese orden en lugar de las características subyacentes de los datos. Al mezclar el orden de las muestras en cada época, el modelo ve diferentes combinaciones de datos, lo que lo ayuda a aprender de manera más robusta y a generalizar mejor a datos no vistos.
+
+    Implementación en PyTorch: Esto se logra configurando shuffle=True en el DataLoader. El DataLoader (o su Sampler subyacente) se encarga de barajar los índices de las muestras del Dataset al inicio de cada época.
+
+2. Ordenar las Secuencias por Longitud Dentro de Cada Lote (Batch):
+
+    Propósito: Eficiencia computacional para RNNs. Como ya discutimos, las RNNs (especialmente con pack_padded_sequence) funcionan de manera mucho más eficiente cuando las secuencias dentro de un lote están ordenadas por longitud (generalmente de forma descendente). Esto minimiza la cantidad de cálculos sobre el "padding" (relleno) y optimiza el uso de la memoria de la GPU.
+
+    Implementación en PyTorch: Esto se realiza dentro de la función collate_fn que le pasas al DataLoader. La collate_fn recibe una lista de muestras individuales que el DataLoader ha seleccionado para el lote actual (después del shuffle global) y es responsable de agruparlas, ordenarlas y acolcharlas.
+
+3. Acolchar (Pad) las Secuencias Ordenadas:
+
+    Propósito: Crear tensores rectangulares. Una vez que las secuencias están ordenadas dentro del lote, se rellenan con ceros (o un valor específico) para que todas tengan la misma longitud (la del elemento más largo del lote).
+
+    Implementación en PyTorch: También se realiza dentro de la collate_fn utilizando torch.nn.utils.rnn.pad_sequence.
