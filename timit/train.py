@@ -226,7 +226,7 @@ if __name__ == "__main__":
     )
 
     # multi-gpu (ddp) save data preparation
-    #run_on_main(
+    # run_on_main(
     #    prepare_timit,
     #    kwargs={
     #        "data_folder": hparams["data_folder"],
@@ -235,9 +235,9 @@ if __name__ == "__main__":
     #        "save_json_test": hparams["test_annotation"],
     #        "skip_prep": hparams["skip_prep"],
     #        "uppercase": hparams["uppercase"],
-     #   },
-    #)
-    run_on_main(hparams["prepare_noise_data"])
+    #    },
+    # )
+    #run_on_main(hparams["prepare_noise_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     train_data, valid_data, test_data, label_encoder = dataio_prep(hparams)
