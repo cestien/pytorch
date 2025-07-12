@@ -1,0 +1,22 @@
+{
+    "sample_001": {
+        "wav": "data/dummy_wavs/audio_001.wav",
+        "duration": 1.5,
+        "phn": "aa sp ae z"
+    },
+    "sample_002": {
+        "wav": "data/dummy_wavs/audio_002.wav",
+        "duration": 2.0,
+        "phn": "sil aa ae ah"
+    },
+    "sample_003": {
+        "wav": "data/dummy_wavs/audio_003.wav",
+        "duration": 0.8,
+        "phn": "z"
+    },
+    "sample_004": {
+        "wav": "data/dummy_wavs/audio_004.wav",
+        "duration": 2.5,
+        "phn": "aa ae sp sil ah z"
+    }
+}
