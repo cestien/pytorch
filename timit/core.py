@@ -923,7 +923,7 @@ class Brain:
         raise NotImplementedError
         return
 
-    def on_stage_start(self, stage, epoch=None):
+    def (self, stage, epoch=None):
         """Gets called when a stage starts.
 
         Useful for defining class variables used during the stage.
@@ -1379,7 +1379,7 @@ class Brain:
         # Training stage
         self.on_stage_start(Stage.TRAIN, epoch)
         self.modules.train()
-        self.zero_grad()
+        zero_grad()
 
         # Reset nonfinite count to 0 each epoch
         self.nonfinite_count = 0
@@ -1785,10 +1785,10 @@ class Brain:
 
         Returns
         -------
-        avg_loss : float
+        avg_loss : float    
             The average loss.
         """
-        if torch.isfinite(loss):
+        if torch.isfinite(loss):    
             avg_loss -= avg_loss / self.step
             avg_loss += float(loss) / self.step
         return avg_loss
