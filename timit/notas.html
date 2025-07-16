@@ -43,92 +43,18 @@
 </ul>
 </li>
 </ul>
-<h3 dir="auto" id="ejemplo-para-el-caso-de-mnist">Ejemplo para el caso de MNIST</h3>
-<pre><code class="code-line language-python" dir="auto"><span class="hljs-keyword">import</span> numpy <span class="hljs-keyword">as</span> np
-<span class="hljs-keyword">import</span> torch
-<span class="hljs-keyword">import</span> torch.nn.functional <span class="hljs-keyword">as</span> F
-<span class="hljs-keyword">from</span> torch <span class="hljs-keyword">import</span> nn,optim,tensor
-<span class="hljs-keyword">from</span> torch.utils.data <span class="hljs-keyword">import</span> TensorDataset, DataLoader
-<span class="hljs-keyword">import</span> pickle, gzip
-
-dev = torch.device(<span class="hljs-string">&#x27;cuda&#x27;</span>) <span class="hljs-keyword">if</span> torch.cuda.is_available() <span class="hljs-keyword">else</span> torch.device(<span class="hljs-string">&#x27;cpu&#x27;</span>)
-
-<span class="hljs-comment"># Entrenamiento y validación</span>
-<span class="hljs-keyword">def</span> <span class="hljs-title function_">fit</span>(<span class="hljs-params">epochs, model, loss_func, opt, train_dl, valid_dl</span>):
-    <span class="hljs-keyword">for</span> epoch <span class="hljs-keyword">in</span> <span class="hljs-built_in">range</span>(epochs):
-        <span class="hljs-comment"># Entrenamiento</span>
-        model.train()
-        <span class="hljs-keyword">for</span> xb,yb <span class="hljs-keyword">in</span> train_dl: 
-            pb = model(xb)
-            loss = loss_func(pb,yb)  
-            loss.backward()
-            opt.step()
-            opt.zero_grad()
-        <span class="hljs-comment"># Validación</span>
-        model.<span class="hljs-built_in">eval</span>()
-        losses = <span class="hljs-built_in">list</span>()
-        nums = <span class="hljs-built_in">list</span>()
-        <span class="hljs-keyword">with</span> torch.no_grad():
-            <span class="hljs-keyword">for</span> xb,yb <span class="hljs-keyword">in</span> valid_dl:
-                pb = model(xb)
-                loss  = loss_func(pb,yb)
-                num = <span class="hljs-built_in">len</span>(xb)
-                losses.append(loss.item())
-                nums.append(num)
-        val_loss = np.<span class="hljs-built_in">sum</span>(np.multiply(losses,nums)) / np.<span class="hljs-built_in">sum</span>(nums)
-        <span class="hljs-built_in">print</span>(epoch, val_loss)
-
-<span class="hljs-comment"># Modifica las dimensiones de las features x</span>
-<span class="hljs-keyword">class</span> <span class="hljs-title class_">Convert_x</span>():
-    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self, dl</span>):
-        self.dl = dl
-    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__len__</span>(<span class="hljs-params">self</span>): <span class="hljs-keyword">return</span> <span class="hljs-built_in">len</span>(self.dl)
-    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__iter__</span>(<span class="hljs-params">self</span>):
-        <span class="hljs-comment"># batches = iter(self.dl)</span>
-        <span class="hljs-keyword">for</span> b <span class="hljs-keyword">in</span> self.dl:
-            xp = b[<span class="hljs-number">0</span>].view(-<span class="hljs-number">1</span>,<span class="hljs-number">1</span>,<span class="hljs-number">28</span>,<span class="hljs-number">28</span>).to(dev)
-            yp = b[<span class="hljs-number">1</span>].to(dev)
-            <span class="hljs-keyword">yield</span> xp, yp
-            
-<span class="hljs-comment"># Convierte el dataset en grupos de batches</span>
-<span class="hljs-keyword">def</span> <span class="hljs-title function_">get_dataloader</span>(<span class="hljs-params">x,y,bs,shuffle</span>):
-    ds = TensorDataset(*<span class="hljs-built_in">map</span>(tensor, (x,y)))
-    dl = DataLoader(ds, batch_size=bs, shuffle=shuffle)
-    dlp = Convert_x(dl)
-    <span class="hljs-keyword">return</span> dlp
-
-<span class="hljs-comment"># Aplana los datos de la feature x. La usa nn.Sequential</span>
-<span class="hljs-keyword">class</span> <span class="hljs-title class_">Aplanar</span>(nn.Module):
-    <span class="hljs-keyword">def</span> <span class="hljs-title function_">__init__</span>(<span class="hljs-params">self</span>):
-        <span class="hljs-built_in">super</span>().__init__() <span class="hljs-comment"># Llamada al constructor de la clase padre</span>
-    <span class="hljs-keyword">def</span> <span class="hljs-title function_">forward</span>(<span class="hljs-params">self, x</span>):
-        <span class="hljs-keyword">return</span> x.view(x.size(<span class="hljs-number">0</span>),-<span class="hljs-number">1</span>)
-
-<span class="hljs-comment"># Main</span>
-bs=<span class="hljs-number">64</span>
-lr=<span class="hljs-number">0.1</span>
-epochs=<span class="hljs-number">4</span>
-<span class="hljs-keyword">with</span> gzip.<span class="hljs-built_in">open</span>(<span class="hljs-string">&#x27;data/mnist.pkl.gz&#x27;</span>, <span class="hljs-string">&#x27;rb&#x27;</span>) <span class="hljs-keyword">as</span> f:
-    ((train_x, train_y), (valid_x, valid_y), _) = pickle.load(f, encoding=<span class="hljs-string">&#x27;latin-1&#x27;</span>)
-model = nn.Sequential(
-    nn.Conv2d(<span class="hljs-number">1</span>,  <span class="hljs-number">16</span>, kernel_size=<span class="hljs-number">3</span>, stride=<span class="hljs-number">2</span>, padding=<span class="hljs-number">1</span>), nn.ReLU(),
-    nn.Conv2d(<span class="hljs-number">16</span>, <span class="hljs-number">16</span>, kernel_size=<span class="hljs-number">3</span>, stride=<span class="hljs-number">2</span>, padding=<span class="hljs-number">1</span>), nn.ReLU(),
-    nn.Conv2d(<span class="hljs-number">16</span>, <span class="hljs-number">10</span>, kernel_size=<span class="hljs-number">3</span>, stride=<span class="hljs-number">2</span>, padding=<span class="hljs-number">1</span>), nn.ReLU(),
-    nn.AdaptiveAvgPool2d(<span class="hljs-number">1</span>),
-    Aplanar()
-).to(dev)
-loss_func = F.cross_entropy
-opt = optim.SGD(model.parameters(), lr=lr, momentum=<span class="hljs-number">0.9</span>)
-train_dl = get_dataloader(train_x, train_y, bs,   shuffle=<span class="hljs-literal">True</span>)
-valid_dl = get_dataloader(valid_x, valid_y, bs*<span class="hljs-number">2</span>, shuffle=<span class="hljs-literal">False</span> )
-fit(epochs, model, loss_func, opt, train_dl, valid_dl)
-</code></pre>
 <h2 dir="auto" id="reconocedor-simple-de-fonemas-usando-timit">Reconocedor simple de fonemas usando TIMIT</h2>
 <h4 dir="auto" id="preparaci%C3%B3n-de-los-datos">Preparación de los datos</h4>
 <ul dir="auto">
 <li dir="auto">A partir de los json determinar los pares (wav, transcripción) del train, valid y test datasets. Cada transcripción es una lista de fonos codificados.</li>
-<li dir="auto">Ordenar los datasets por duración de mayor a menor</li>
-<li dir="auto">Usando dataloader separar los datos en batches con el correspondiente padding. Cuando se construye el conjunto de train hay que poner shuffle=True, de esta manera en cada epoch todos los datos de train se reordenan aleatoriamente antes de ser separados nuevamente en batches. El bs de validación puede ser más grande que el de train ya que no hay que tocar el modelo.</li>
+<li dir="auto">Luego usamos la técnica <em>shuffle global sort local</em> que consiste en:
+<ul dir="auto">
+<li dir="auto"><strong>Shuffle global</strong>: Desordenar el dataset globalmente en cada epoch. Esto se hace en pytorch seteando <code>suffle=True</code> en el Dataloader</li>
+<li dir="auto"><strong>Sort local</strong>: Ordenar las secuencias por longitud dentro de cada batch. y luego padearlas. Ambas cosas se hacen dentro de  la collate_fn.</li>
+</ul>
+</li>
+<li dir="auto">En el conjunto de validación y de test la parte de shuffle global se desactiva pero no la de sort local.</li>
+<li dir="auto">El bs de validación puede ser más grande que el de train ya que no hay que tocar el modelo.</li>
 <li dir="auto">Los labels que devuelve el json son codificados en enteros. Para eso se usa el método <code>load_phoneme_vocabulary</code> el cual genera dos diccionarios para codificar y decodificar.</li>
 </ul>
 <h3 dir="auto" id="bloque-de-convoluci%C3%B3n">Bloque de convolución</h3>
@@ -142,20 +68,59 @@ fit(epochs, model, loss_func, opt, train_dl, valid_dl)
 <section><eqn><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>Y</mi><mo stretchy="false">(</mo><msub><mi>N</mi><mi>i</mi></msub><mo separator="true">,</mo><mi>C</mi><msub><mi>O</mi><mi>j</mi></msub><mo stretchy="false">)</mo><mo>=</mo><mtext>bias</mtext><mo stretchy="false">(</mo><mi>C</mi><msub><mi>O</mi><mi>j</mi></msub><mo stretchy="false">)</mo><mo>+</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>0</mn></mrow><mrow><mi>C</mi><mi>I</mi><mo>−</mo><mn>1</mn></mrow></munderover><mtext>kernel</mtext><mo stretchy="false">(</mo><mi>C</mi><msub><mi>O</mi><mi>j</mi></msub><mo separator="true">,</mo><mi>k</mi><mo stretchy="false">)</mo><mo>∗</mo><mi>X</mi><mo stretchy="false">(</mo><msub><mi>N</mi><mi>i</mi></msub><mo separator="true">,</mo><mi>k</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">
   Y(N_i,CO_{j}) = \text{bias}(CO_{j}) + \sum_{k=0}^{CI-1}\text{kernel}(CO_j,k)*X(N_i,k)
   </annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.036108em;vertical-align:-0.286108em;"></span><span class="mord mathnormal" style="margin-right:0.22222em;">Y</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.31166399999999994em;"><span style="top:-2.5500000000000003em;margin-left:-0.10903em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mord mathnormal" style="margin-right:0.07153em;">C</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.311664em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.05724em;">j</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.286108em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span></span><span class="base"><span class="strut" style="height:1.036108em;vertical-align:-0.286108em;"></span><span class="mord text"><span class="mord">bias</span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.07153em;">C</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.311664em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.05724em;">j</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.286108em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:3.1304490000000005em;vertical-align:-1.302113em;"></span><span class="mop op-limits"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.8283360000000002em;"><span style="top:-1.8478869999999998em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.03148em;">k</span><span class="mrel mtight">=</span><span class="mord mtight">0</span></span></span></span><span style="top:-3.0500049999999996em;"><span class="pstrut" style="height:3.05em;"></span><span><span class="mop op-symbol large-op">∑</span></span></span><span style="top:-4.300005em;margin-left:0em;"><span class="pstrut" style="height:3.05em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.07153em;">C</span><span class="mord mathnormal mtight" style="margin-right:0.07847em;">I</span><span class="mbin mtight">−</span><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.302113em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mord text"><span class="mord">kernel</span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.07153em;">C</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">O</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.311664em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.05724em;">j</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.286108em;"><span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mord mathnormal" style="margin-right:0.03148em;">k</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">∗</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.07847em;">X</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.10903em;">N</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.31166399999999994em;"><span style="top:-2.5500000000000003em;margin-left:-0.10903em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">i</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mord mathnormal" style="margin-right:0.03148em;">k</span><span class="mclose">)</span></span></span></span></span></eqn></section></math>
-<h4 dir="auto" id="la-clase-cnn_block">La clase <code>CNN_block</code></h4>
-<p dir="auto">Implementa una sequencia convolución, layer normalization, leaky relu, max pool y drop out</p>
-<pre><code class="code-line language-python" dir="auto">CNN_block(
-(bloque_cnn): Sequential(
-  (<span class="hljs-number">0</span>): Conv1d(<span class="hljs-number">80</span>, <span class="hljs-number">64</span>, kernel_size=(<span class="hljs-number">3</span>,), stride=(<span class="hljs-number">1</span>,), padding=(<span class="hljs-number">1</span>,), padding_mode=replicate)
-  (<span class="hljs-number">1</span>): Transpose()
-  (<span class="hljs-number">2</span>): LayerNorm((<span class="hljs-number">64</span>,), eps=<span class="hljs-number">1e-05</span>, elementwise_affine=<span class="hljs-literal">True</span>)
-  (<span class="hljs-number">3</span>): Transpose()
-  (<span class="hljs-number">4</span>): LeakyReLU(negative_slope=<span class="hljs-number">0.01</span>)
-  (<span class="hljs-number">5</span>): MaxPool1d(kernel_size=<span class="hljs-number">2</span>, stride=<span class="hljs-number">1</span>, padding=<span class="hljs-number">0</span>, dilation=<span class="hljs-number">1</span>, ceil_mode=<span class="hljs-literal">False</span>)
-  (<span class="hljs-number">6</span>): Dropout(p=<span class="hljs-number">0.1</span>, inplace=<span class="hljs-literal">False</span>)
-)
-)
-</code></pre>
+<p dir="auto">Para la mayoría de los casos generales y para asegurar una buena generalización, la estrategia de &quot;shuffle global, sort local dentro del batch&quot; (es decir, DataLoader(..., shuffle=True, collate_fn=custom_collate_fn)) es la más recomendada. Permite la eficiencia del padding sin sacrificar la aleatoriedad necesaria para la generalización.</p>
+<ol dir="auto">
+<li dir="auto">
+<p dir="auto">Desordenar (Shuffle) el Dataset Globalmente en Cada Época:</p>
+<p dir="auto">Propósito: Generalización y evitar sobreajuste (overfitting). Si el modelo siempre ve los mismos datos en el mismo orden, podría aprender patrones específicos de ese orden en lugar de las características subyacentes de los datos. Al mezclar el orden de las muestras en cada época, el modelo ve diferentes combinaciones de datos, lo que lo ayuda a aprender de manera más robusta y a generalizar mejor a datos no vistos.</p>
+<p dir="auto">Implementación en PyTorch: Esto se logra configurando shuffle=True en el DataLoader. El DataLoader (o su Sampler subyacente) se encarga de barajar los índices de las muestras del Dataset al inicio de cada época.</p>
+</li>
+<li dir="auto">
+<p dir="auto">Ordenar las Secuencias por Longitud Dentro de Cada Lote (Batch):</p>
+<p dir="auto">Propósito: Eficiencia computacional para RNNs. Como ya discutimos, las RNNs (especialmente con pack_padded_sequence) funcionan de manera mucho más eficiente cuando las secuencias dentro de un lote están ordenadas por longitud (generalmente de forma descendente). Esto minimiza la cantidad de cálculos sobre el &quot;padding&quot; (relleno) y optimiza el uso de la memoria de la GPU.</p>
+<p dir="auto">Implementación en PyTorch: Esto se realiza dentro de la función collate_fn que le pasas al DataLoader. La collate_fn recibe una lista de muestras individuales que el DataLoader ha seleccionado para el lote actual (después del shuffle global) y es responsable de agruparlas, ordenarlas y acolcharlas.</p>
+</li>
+<li dir="auto">
+<p dir="auto">Acolchar (Pad) las Secuencias Ordenadas:</p>
+<p dir="auto">Propósito: Crear tensores rectangulares. Una vez que las secuencias están ordenadas dentro del lote, se rellenan con ceros (o un valor específico) para que todas tengan la misma longitud (la del elemento más largo del lote).</p>
+<p dir="auto">Implementación en PyTorch: También se realiza dentro de la collate_fn utilizando torch.nn.utils.rnn.pad_sequence.</p>
+</li>
+</ol>
+<h2 dir="auto" id="pseudo-c%C3%B3digo-de-corepy">Pseudo código de <code>core.py</code></h2>
+<pre><code class="code-line language-python" dir="auto"><span class="hljs-keyword">def</span> <span class="hljs-title function_">fit</span>():
+  on_fit_start() <span class="hljs-comment"># Hace init_optimizer()</span>
+  <span class="hljs-keyword">for</span> epoch <span class="hljs-keyword">in</span> epoch_counter:
+
+    <span class="hljs-comment">#----_fit_train()-------</span>
+    on_stage_start() 
+    <span class="hljs-keyword">for</span> batch <span class="hljs-keyword">in</span> train_set:
+      <span class="hljs-comment">#---fit_batch()-----</span>
+      on_fit_batch_start() <span class="hljs-comment"># No se usa</span>
+      compute_forward()
+      compute_backward()
+      on_fit_batch_end() <span class="hljs-comment"># No se usa</span>
+      <span class="hljs-comment">#-------------------</span>
+    on_stage_end() 
+    <span class="hljs-comment">#------------------------</span>
+
+    <span class="hljs-comment">#----_fit_valid()--------</span>
+    on_stage_start()
+    <span class="hljs-keyword">for</span> batch <span class="hljs-keyword">in</span> valid_set:
+      <span class="hljs-comment">#--evaluate_batch()--</span>
+      compute_forward()
+      compute_backward()
+      <span class="hljs-comment">#--------------------</span>
+    on_stage(end) 
+
+<span class="hljs-keyword">def</span> <span class="hljs-title function_">evaluate</span>():
+  on_evaluate_start()
+  on_stage_start() 
+  <span class="hljs-keyword">for</span> batch <span class="hljs-keyword">in</span> test_set:
+    <span class="hljs-comment">#--evaluate_batch--</span>
+    compute_forward()
+    compute_backward()
+    <span class="hljs-comment">#------------------</span>
+  on_state_end() </code></pre>
 
 </body>
 </html>

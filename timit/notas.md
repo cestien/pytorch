@@ -59,3 +59,41 @@ Para la mayoría de los casos generales y para asegurar una buena generalizació
     Propósito: Crear tensores rectangulares. Una vez que las secuencias están ordenadas dentro del lote, se rellenan con ceros (o un valor específico) para que todas tengan la misma longitud (la del elemento más largo del lote).
 
     Implementación en PyTorch: También se realiza dentro de la collate_fn utilizando torch.nn.utils.rnn.pad_sequence.
+
+
+## Pseudo código de `core.py`
+```python
+def fit():
+  on_fit_start() # Hace init_optimizer()
+  for epoch in epoch_counter:
+
+    #----_fit_train()-------
+    on_stage_start() 
+    for batch in train_set:
+      #---fit_batch()-----
+      on_fit_batch_start() # No se usa
+      compute_forward()
+      compute_backward()
+      on_fit_batch_end() # No se usa
+      #-------------------
+    on_stage_end() 
+    #------------------------
+
+    #----_fit_valid()--------
+    on_stage_start()
+    for batch in valid_set:
+      #--evaluate_batch()--
+      compute_forward()
+      compute_backward()
+      #--------------------
+    on_stage(end) 
+
+def evaluate():
+  on_evaluate_start()
+  on_stage_start() 
+  for batch in test_set:
+    #--evaluate_batch--
+    compute_forward()
+    compute_backward()
+    #------------------
+  on_state_end() 
