@@ -89,7 +89,7 @@ def fit():
     on_stage(end) 
 
 def evaluate():
-  on_evaluate_start()
+  on_evaluate_start() # Recobra el mejor modelo para evaluar
   on_stage_start() 
   for batch in test_set:
     #--evaluate_batch--
@@ -97,3 +97,40 @@ def evaluate():
     compute_backward()
     #------------------
   on_state_end() 
+```
+
+
+# Pseudo código de un programa típico
+
+  - Inicializar el modelo (la red neuronal)
+  - Inicializar la función de pérdida, eg. `torch.nn.CrossEntropyLoss`
+  - Inicializar el optimizador, eg. `torch.optim.SGD(modelo.parameters(), lr=0.01, momentum=0.9)`
+  - Inicializar el scheduler, eg. `torch.optim.Adam(params, lr=0.001, betas=(0.9, 0.999),...)` 
+
+  - para cada epoch
+    - train()
+    - test()
+    - actualizar lr: scheduler.step()
+
+---
+
+# Pseudo código de un programa típico
+
+  - train()
+    - para cada minibatch:
+      - Poner a cero los gradientes de los parámetros: optimizer.zero_grad()
+      - Paso forward. Determinar la salida de un minibatch de entrada output = model(data)
+      - Calcular la pérdida de un minibatch loss = funperdida(output, target), es decir: $\mbox{Loss}(y,d;W)$
+      - Calcular el gradiente de un minibatch respecto de los parámetros loss.backward(), es decir: $\nabla_W\mbox{Loss}(W)$
+      - Actualizar los parámetros: optimizer.step(), es decir: $W = W -\eta\nabla_W\mbox{Loss}(W)$
+
+---
+
+# Pseudo código de un programa típico
+  - test()
+    - para todos los datos de test:
+        - Determinar la salida de los datos de test: output = model(data)
+        - Encontrar el índice que da la máxima salida: pred = output.argmax(dim=1, keepdim=True)
+        - Compararlo con el target. Si es igual es correcto sino incorrecto.
+    - determinar el accuracy en base al porcentaje de correctos.    
+

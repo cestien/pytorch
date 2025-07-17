@@ -113,14 +113,71 @@
     on_stage(end) 
 
 <span class="hljs-keyword">def</span> <span class="hljs-title function_">evaluate</span>():
-  on_evaluate_start()
+  on_evaluate_start() <span class="hljs-comment"># Recobra el mejor modelo para evaluar</span>
   on_stage_start() 
   <span class="hljs-keyword">for</span> batch <span class="hljs-keyword">in</span> test_set:
     <span class="hljs-comment">#--evaluate_batch--</span>
     compute_forward()
     compute_backward()
     <span class="hljs-comment">#------------------</span>
-  on_state_end() </code></pre>
+  on_state_end() 
+</code></pre>
+<h1 dir="auto" id="pseudo-c%C3%B3digo-de-un-programa-t%C3%ADpico">Pseudo código de un programa típico</h1>
+<ul dir="auto">
+<li dir="auto">
+<p dir="auto">Inicializar el modelo (la red neuronal)</p>
+</li>
+<li dir="auto">
+<p dir="auto">Inicializar la función de pérdida, eg. <code>torch.nn.CrossEntropyLoss</code></p>
+</li>
+<li dir="auto">
+<p dir="auto">Inicializar el optimizador, eg. <code>torch.optim.SGD(modelo.parameters(), lr=0.01, momentum=0.9)</code></p>
+</li>
+<li dir="auto">
+<p dir="auto">Inicializar el scheduler, eg. <code>torch.optim.Adam(params, lr=0.001, betas=(0.9, 0.999),...)</code></p>
+</li>
+<li dir="auto">
+<p dir="auto">para cada epoch</p>
+<ul dir="auto">
+<li dir="auto">train()</li>
+<li dir="auto">test()</li>
+<li dir="auto">actualizar lr: scheduler.step()</li>
+</ul>
+</li>
+</ul>
+<hr dir="auto">
+<h1 dir="auto" id="pseudo-cc3b3digo-de-un-programa-tc3adpico-1">Pseudo código de un programa típico</h1>
+<ul dir="auto">
+<li dir="auto">train()
+<ul dir="auto">
+<li dir="auto">para cada minibatch:
+<ul dir="auto">
+<li dir="auto">Poner a cero los gradientes de los parámetros: optimizer.zero_grad()</li>
+<li dir="auto">Paso forward. Determinar la salida de un minibatch de entrada output = model(data)</li>
+<li dir="auto">Calcular la pérdida de un minibatch loss = funperdida(output, target), es decir: <eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mstyle mathcolor="#cc0000"><mtext>\mbox</mtext></mstyle><mrow><mi>L</mi><mi>o</mi><mi>s</mi><mi>s</mi></mrow><mo stretchy="false">(</mo><mi>y</mi><mo separator="true">,</mo><mi>d</mi><mo separator="true">;</mo><mi>W</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">\mbox{Loss}(y,d;W)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord text" style="color:#cc0000;"><span class="mord" style="color:#cc0000;">\mbox</span></span><span class="mord"><span class="mord mathnormal">L</span><span class="mord mathnormal">oss</span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.03588em;">y</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mord mathnormal">d</span><span class="mpunct">;</span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">W</span><span class="mclose">)</span></span></span></span></eq></li>
+<li dir="auto">Calcular el gradiente de un minibatch respecto de los parámetros loss.backward(), es decir: <eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi mathvariant="normal">∇</mi><mi>W</mi></msub><mstyle mathcolor="#cc0000"><mtext>\mbox</mtext></mstyle><mrow><mi>L</mi><mi>o</mi><mi>s</mi><mi>s</mi></mrow><mo stretchy="false">(</mo><mi>W</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">\nabla_W\mbox{Loss}(W)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord">∇</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.32833099999999993em;"><span style="top:-2.5500000000000003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.13889em;">W</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord text" style="color:#cc0000;"><span class="mord" style="color:#cc0000;">\mbox</span></span><span class="mord"><span class="mord mathnormal">L</span><span class="mord mathnormal">oss</span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.13889em;">W</span><span class="mclose">)</span></span></span></span></eq></li>
+<li dir="auto">Actualizar los parámetros: optimizer.step(), es decir: <eq><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>W</mi><mo>=</mo><mi>W</mi><mo>−</mo><mi>η</mi><msub><mi mathvariant="normal">∇</mi><mi>W</mi></msub><mstyle mathcolor="#cc0000"><mtext>\mbox</mtext></mstyle><mrow><mi>L</mi><mi>o</mi><mi>s</mi><mi>s</mi></mrow><mo stretchy="false">(</mo><mi>W</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">W = W -\eta\nabla_W\mbox{Loss}(W)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.68333em;vertical-align:0em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">W</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span></span><span class="base"><span class="strut" style="height:0.76666em;vertical-align:-0.08333em;"></span><span class="mord mathnormal" style="margin-right:0.13889em;">W</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">η</span><span class="mord"><span class="mord">∇</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.32833099999999993em;"><span style="top:-2.5500000000000003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.13889em;">W</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord text" style="color:#cc0000;"><span class="mord" style="color:#cc0000;">\mbox</span></span><span class="mord"><span class="mord mathnormal">L</span><span class="mord mathnormal">oss</span></span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.13889em;">W</span><span class="mclose">)</span></span></span></span></eq></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<hr dir="auto">
+<h1 dir="auto" id="pseudo-cc3b3digo-de-un-programa-tc3adpico-2">Pseudo código de un programa típico</h1>
+<ul dir="auto">
+<li dir="auto">test()
+<ul dir="auto">
+<li dir="auto">para todos los datos de test:
+<ul dir="auto">
+<li dir="auto">Determinar la salida de los datos de test: output = model(data)</li>
+<li dir="auto">Encontrar el índice que da la máxima salida: pred = output.argmax(dim=1, keepdim=True)</li>
+<li dir="auto">Compararlo con el target. Si es igual es correcto sino incorrecto.</li>
+</ul>
+</li>
+<li dir="auto">determinar el accuracy en base al porcentaje de correctos.</li>
+</ul>
+</li>
+</ul>
 
 </body>
 </html>
