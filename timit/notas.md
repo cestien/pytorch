@@ -120,9 +120,9 @@ def evaluate():
     - para cada minibatch:
       - Poner a cero los gradientes de los parámetros: optimizer.zero_grad()
       - Paso forward. Determinar la salida de un minibatch de entrada output = model(data)
-      - Calcular la pérdida de un minibatch loss = funperdida(output, target), es decir: $\mbox{Loss}(y,d;W)$
-      - Calcular el gradiente de un minibatch respecto de los parámetros loss.backward(), es decir: $\nabla_W\mbox{Loss}(W)$
-      - Actualizar los parámetros: optimizer.step(), es decir: $W = W -\eta\nabla_W\mbox{Loss}(W)$
+      - Calcular la pérdida de un minibatch loss = funperdida(output, target), es decir: $\text{Loss}(y,d;W)$
+      - Calcular el gradiente de un minibatch respecto de los parámetros loss.backward(), es decir: $\nabla_W\text{Loss}(W)$
+      - Actualizar los parámetros: optimizer.step(), es decir: $W = W -\eta\nabla_W\text{Loss}(W)$
 
 ---
 
