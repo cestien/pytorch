@@ -134,4 +134,3 @@ def evaluate():
         - Compararlo con el target. Si es igual es correcto sino incorrecto.
     - determinar el accuracy en base al porcentaje de correctos.    
 
-recordar
